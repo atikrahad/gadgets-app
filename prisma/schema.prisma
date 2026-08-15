@@ -1,0 +1,441 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+enum ProductSource {
+  MANUAL
+  N8N
+  API
+  DISCOVERY
+}
+
+enum ProductStatus {
+  DRAFT
+  PROCESSING
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+  FAILED
+}
+
+model Room {
+  id             String        @id @default(uuid())
+  name           String
+  slug           String        @unique
+  description    String?       @db.Text
+  image          String?
+  seoTitle       String?
+  seoDescription String?       @db.Text
+  published      Boolean       @default(true)
+
+  // Relations
+  products       ProductRoom[]
+  setups         Setup[]
+  buyingGuides   BuyingGuide[]
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([slug])
+}
+
+model Aesthetic {
+  id             String             @id @default(uuid())
+  name           String
+  slug           String             @unique
+  description    String?            @db.Text
+  image          String?
+  colorHex       String?
+  seoTitle       String?
+  seoDescription String?            @db.Text
+  published      Boolean            @default(true)
+
+  // Relations
+  products       ProductAesthetic[]
+  setups         SetupAesthetic[]
+
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([slug])
+}
+
+model Setup {
+  id             String           @id @default(uuid())
+  title          String
+  slug           String           @unique
+  description    String           @db.Text
+  heroImage      String
+  published      Boolean          @default(true)
+  featured       Boolean          @default(false)
+  
+  roomId         String?
+  room           Room?            @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  // Relations
+  products       SetupProduct[]
+  aesthetics     SetupAesthetic[]
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([slug])
+  @@index([roomId])
+}
+
+model Category {
+  id             String            @id @default(uuid())
+  name           String
+  slug           String            @unique
+  description    String?           @db.Text
+  image          String?
+  parentId       String?
+  parent         Category?         @relation("NestedCategories", fields: [parentId], references: [id], onDelete: Cascade)
+  children       Category[]        @relation("NestedCategories")
+  seoTitle       String?
+  seoDescription String?           @db.Text
+  published      Boolean           @default(true)
+  
+  // Relations
+  products       ProductCategory[]
+  buyingGuides   BuyingGuide[]
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+model Product {
+  id               String               @id @default(uuid())
+  title            String
+  slug             String               @unique
+  asin             String?              // Amazon Standard Identification Number
+  brand            String
+  description      String               @db.Text
+  shortDescription String               @db.Text
+  images           String[]             // Array of secondary images
+  affiliateUrl     String               // Default fallback buying link
+  amazonUrl        String?              // Direct Amazon US URL
+  marketplace      String               @default("US")
+  status           ProductStatus        @default(DRAFT)
+  source           ProductSource        @default(MANUAL)
+  featured         Boolean              @default(false)
+  badgeLabel       String?              // e.g. "Best for Minimalist Setups", "Cozy Pick"
+  
+  // Timestamps
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  publishedAt      DateTime?
+
+  // Relations
+  editorial        ProductEditorial?
+  features         ProductFeature[]
+  specifications   ProductSpecification[]
+  categories       ProductCategory[]
+  rooms            ProductRoom[]
+  aesthetics       ProductAesthetic[]
+  setups           SetupProduct[]
+  reviews          Review[]
+  buyingGuides     BuyingGuideProduct[]
+  comparisons      ComparisonProduct[]
+  faqs             ProductFAQ[]
+  offers           ProductOffer[]
+
+  @@index([slug])
+  @@index([asin])
+  @@index([marketplace])
+  @@index([status])
+  @@index([createdAt])
+  @@index([publishedAt])
+}
+
+model ProductRoom {
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  roomId    String
+  room      Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([productId, roomId])
+  @@index([productId])
+  @@index([roomId])
+}
+
+model ProductAesthetic {
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  aestheticId String
+  aesthetic   Aesthetic @relation(fields: [aestheticId], references: [id], onDelete: Cascade)
+
+  @@id([productId, aestheticId])
+  @@index([productId])
+  @@index([aestheticId])
+}
+
+model SetupProduct {
+  setupId   String
+  setup     Setup   @relation(fields: [setupId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position  Int?
+
+  @@id([setupId, productId])
+  @@index([setupId])
+  @@index([productId])
+}
+
+model SetupAesthetic {
+  setupId     String
+  setup       Setup     @relation(fields: [setupId], references: [id], onDelete: Cascade)
+  aestheticId String
+  aesthetic   Aesthetic @relation(fields: [aestheticId], references: [id], onDelete: Cascade)
+
+  @@id([setupId, aestheticId])
+  @@index([setupId])
+  @@index([aestheticId])
+}
+
+model ProductEditorial {
+  id             String    @id @default(uuid())
+  productId      String    @unique
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  summary        String    @db.Text
+  pros           String[]
+  cons           String[]
+  bestFor        String?   @db.Text
+  notBestFor     String?   @db.Text
+  buyingAdvice   String?   @db.Text
+  verdict        String    @db.Text
+  recommendation String?   @db.Text
+  
+  generatedAt    DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model ProductFeature {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String
+  value       String   @db.Text
+  description String?  @db.Text
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+}
+
+model ProductSpecification {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  key         String
+  value       String
+  group       String?  // e.g. "Technical Specs", "Dimensions"
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+}
+
+model ProductCategory {
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([productId])
+  @@index([categoryId])
+}
+
+model ProductOffer {
+  id            String   @id @default(uuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  marketplace   String   // "US", "UK", "CA", "DE", "IN"
+  asin          String?  // Local ASIN
+  price         Float
+  currency      String   @default("USD")
+  affiliateLink String
+  isAvailable   Boolean  @default(true)
+  lastChecked   DateTime @default(now())
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([productId, marketplace])
+  @@index([productId])
+  @@index([asin])
+  @@index([marketplace])
+}
+
+model Author {
+  id           String        @id @default(uuid())
+  name         String
+  slug         String        @unique
+  bio          String?       @db.Text
+  avatar       String?
+  
+  // Relations
+  reviews      Review[]
+  buyingGuides BuyingGuide[]
+  blogPosts    BlogPost[]
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([slug])
+}
+
+model Review {
+  id            String    @id @default(uuid())
+  slug          String    @unique
+  title         String
+  excerpt       String    @db.Text
+  content       String    @db.Text
+  rating        Float
+  verdict       String    @db.Text
+  isPublished   Boolean   @default(true)
+  isAiGenerated Boolean   @default(false)
+  
+  // Relations
+  productId     String?
+  product       Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  authorId      String
+  author        Author    @relation(fields: [authorId], references: [id])
+
+  publishedAt   DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([slug])
+  @@index([productId])
+  @@index([authorId])
+  @@index([publishedAt])
+}
+
+model BuyingGuide {
+  id             String               @id @default(uuid())
+  title          String
+  slug           String               @unique
+  excerpt        String               @db.Text
+  content        String               @db.Text
+  featuredImage  String?
+  seoTitle       String?
+  seoDescription String?              @db.Text
+  
+  // Relations
+  authorId       String
+  author         Author               @relation(fields: [authorId], references: [id])
+  categoryId     String?
+  category       Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  roomId         String?
+  room           Room?                @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  products       BuyingGuideProduct[]
+
+  publishedAt    DateTime             @default(now())
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([slug])
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([roomId])
+  @@index([publishedAt])
+}
+
+model BuyingGuideProduct {
+  buyingGuideId String
+  buyingGuide   BuyingGuide @relation(fields: [buyingGuideId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rank          Int
+  commentary    String      @db.Text
+
+  @@id([buyingGuideId, productId])
+  @@index([buyingGuideId])
+  @@index([productId])
+}
+
+model BlogPost {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  excerpt     String   @db.Text
+  content     String   @db.Text
+  image       String?
+  
+  // Relations
+  authorId    String
+  author      Author   @relation(fields: [authorId], references: [id])
+
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+  @@index([authorId])
+  @@index([publishedAt])
+}
+
+model Comparison {
+  id          String              @id @default(uuid())
+  slug        String              @unique
+  title       String
+  description String              @db.Text
+  
+  // Relations
+  products    ComparisonProduct[]
+
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([slug])
+}
+
+model ComparisonProduct {
+  comparisonId String
+  comparison   Comparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rank         Int?
+
+  @@id([comparisonId, productId])
+  @@index([comparisonId])
+  @@index([productId])
+}
+
+model FAQ {
+  id        String       @id @default(uuid())
+  question  String
+  answer    String       @db.Text
+  slug      String?      @unique
+  
+  // Relations
+  products  ProductFAQ[]
+
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([slug])
+}
+
+model ProductFAQ {
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  faqId     String
+  faq       FAQ     @relation(fields: [faqId], references: [id], onDelete: Cascade)
+
+  @@id([productId, faqId])
+  @@index([productId])
+  @@index([faqId])
+}
