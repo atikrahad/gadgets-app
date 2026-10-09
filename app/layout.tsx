@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { siteConfig } from "@/config/site";
 import { generateOrganizationJsonLd, generateWebSiteJsonLd } from "@/lib/seo/jsonld";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -73,6 +74,7 @@ export default function RootLayout({
         <Header />
         <main className="flex-grow flex flex-col">{children}</main>
         <Footer />
+        <GoogleAnalytics gaId="G-3LQDPM2NQB" />
       </body>
     </html>
   );
